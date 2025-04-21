@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <title>Time Tracker</title>
+</head>
+<body>
+  <h1>Time Tracker</h1>
+  <div class="controls">
+    <button onclick="refreshTable()">Обновить</button>
+    <button onclick="openAddModal()">+</button>
+    <button onclick="openRemoveModal()">–</button>
+  </div>
+  <table id="activityTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable('app')">Application</th>
+        <th onclick="sortTable('totalTime')">Total Time (hh:mm:ss)</th>
+      </tr>
+    </thead>
+    <tbody id="activityTableBody"></tbody>
+  </table>
+
+  <!-- Modal for adding apps -->
+  <div id="addModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAddModal()">&times;</span>
+      <h2>Добавить приложение</h2>
+      <select id="addAppSelect"></select>
+      <button onclick="addAppToWhitelist()">Добавить</button>
+    </div>
+  </div>
+
+  <!-- Modal for removing apps -->
+  <div id="removeModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeRemoveModal()">&times;</span>
+      <h2>Удалить приложение</h2>
+      <select id="removeAppSelect"></select>
+      <button onclick="removeAppFromWhitelist()">Удалить</button>
+    </div>
+  </div>
+
+  <script>
+    let activities = [];
+    let allApps = [];
+
+    // Fetch activities when the page loads
+    window.addEventListener('DOMContentLoaded', async () => {
+      await refreshTable();
+    });
+
+    // Function to fetch and render activities
+    async function refreshTable() {
+      const data = await window.electronAPI.getActivities();
+      activities = data.activities;
+      allApps = data.allApps;
+      renderTable(activities);
+      updateAddModalOptions();
+      updateRemoveModalOptions();
+    }
+
+    // Format time from seconds to hh:mm:ss
+    function formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Render the table with activities
+    function renderTable(data) {
+      const tableBody = document.getElementById('activityTableBody');
+      tableBody.innerHTML = '';
+
+      data.forEach(activity => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${activity.app}</td>
+          <td>${formatTime(activity.totalTime)}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    // Sort the table by column
+    function sortTable(key) {
+      const sortedActivities = [...activities].sort((a, b) => {
+        if (key === 'app') {
+          return a.app.localeCompare(b.app);
+        } else if (key === 'totalTime') {
+          return b.totalTime - a.totalTime;
+        }
+        return 0;
+      });
+      renderTable(sortedActivities);
+    }
+
+    // Modal for adding apps
+    function openAddModal() {
+      updateAddModalOptions();
+      document.getElementById('addModal').style.display = 'block';
+    }
+
+    function closeAddModal() {
+      document.getElementById('addModal').style.display = 'none';
+    }
+
+    function updateAddModalOptions() {
+      const select = document.getElementById('addAppSelect');
+      select.innerHTML = '';
+      allApps.forEach(app => {
+        const option = document.createElement('option');
+        option.value = app;
+        option.text = app;
+        select.appendChild(option);
+      });
+    }
+
+    async function addAppToWhitelist() {
+      const select = document.getElementById('addAppSelect');
+      const appName = select.value;
+      if (appName) {
+        await window.electronAPI.addToWhitelist(appName);
+        closeAddModal();
+        await refreshTable();
+      }
+    }
+
+    // Modal for removing apps
+    async function openRemoveModal() {
+      const whitelist = await window.electronAPI.getWhitelist();
+      if (whitelist.length === 0) {
+        alert('Белый список пуст!');
+        return;
+      }
+      updateRemoveModalOptions();
+      document.getElementById('removeModal').style.display = 'block';
+    }
+
+    function closeRemoveModal() {
+      document.getElementById('removeModal').style.display = 'none';
+    }
+
+    async function updateRemoveModalOptions() {
+      const select = document.getElementById('removeAppSelect');
+      const whitelist = await window.electronAPI.getWhitelist();
+      select.innerHTML = '';
+      whitelist.forEach(app => {
+        const option = document.createElement('option');
+        option.value = app;
+        option.text = app;
+        select.appendChild(option);
+      });
+    }
+
+    async function removeAppFromWhitelist() {
+      const select = document.getElementById('removeAppSelect');
+      const appName = select.value;
+      if (appName) {
+        await window.electronAPI.removeFromWhitelist(appName);
+        closeRemoveModal();
+        await refreshTable();
+      }
+    }
+
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+      if (event.target.className === 'modal') {
+        closeAddModal();
+        closeRemoveModal();
+      }
+    };
+  </script>
+</body>
+</html>
