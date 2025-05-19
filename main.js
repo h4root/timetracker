@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const activeWin = require('active-win');
+const getWindows = require('get-windows');
 const Store = require('./store');
 
 let mainWindow;
@@ -29,10 +29,11 @@ app.on('ready', () => {
 
   setInterval(async () => {
     try {
-      const window = await activeWin();
-      if (window) {
-        const currentApp = window.owner.name;
-        const currentTitle = window.title;
+      const windows = await getWindows();
+      const activeWindow = windows.find(win => win.isActive);
+      if (activeWindow) {
+        const currentApp = activeWindow.processName;
+        const currentTitle = activeWindow.title;
         const activities = Store.get('activities') || [];
         activities.push({ app: currentApp, title: currentTitle, time: new Date() });
         Store.set('activities', activities);
